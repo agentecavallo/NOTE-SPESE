@@ -1,6 +1,6 @@
 import streamlit as st
 import openpyxl
-from openpyxl.styles import Font
+from openpyxl.styles import Font, Border, Side
 from io import BytesIO
 import datetime
 
@@ -74,7 +74,7 @@ if submit:
         }
         st.session_state.spese_settimana.append(nuova_spesa)
         st.success("✅ Spesa aggiunta alla lista!")
-        st.rerun() # Ricarica per mostrare subito la nuova spesa
+        st.rerun()
 
 # --- MOSTRA LE SPESE E CREA L'EXCEL ---
 if len(st.session_state.spese_settimana) > 0:
@@ -83,14 +83,10 @@ if len(st.session_state.spese_settimana) > 0:
     
     # Mostra l'elenco delle spese con il pulsante di eliminazione
     for i, spesa in enumerate(st.session_state.spese_settimana):
-        # Dividiamo lo spazio: il testo a sinistra, il bottone a destra
         col_testo, col_bottone = st.columns([5, 1])
-        
         with col_testo:
             st.write(f"**{i+1}.** {spesa['data'].strftime('%d/%m/%Y')} - {spesa['motivazione']} | **{spesa['importo']}€** *(Destinazione: {spesa['tipo'].split(' (')[0]})*")
-        
         with col_bottone:
-            # Pulsante per eliminare questa specifica riga
             st.button("❌ Elimina", key=f"elimina_{i}", on_click=elimina_spesa, args=(i,))
 
     totale_settimana = sum(spesa["importo"] for spesa in st.session_state.spese_settimana)
@@ -105,6 +101,20 @@ if len(st.session_state.spese_settimana) > 0:
         
         # --- SPOSTA IN GIÙ TUTTO CIÒ CHE C'È DALLA RIGA 14 ---
         foglio.insert_rows(14, amount=3)
+        
+        # --- APPLICAZIONE DEI BORDI ALLA GRIGLIA ---
+        # Definiamo uno stile di bordo sottile nero per tutti i lati
+        bordo_sottile = Border(
+            left=Side(style='thin'), 
+            right=Side(style='thin'), 
+            top=Side(style='thin'), 
+            bottom=Side(style='thin')
+        )
+        
+        # Applichiamo il bordo a tutte le celle dalla riga 4 alla 16 (la 17 è il nuovo totale)
+        for riga in range(4, 17):
+            for col in ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]:
+                foglio[f"{col}{riga}"].border = bordo_sottile
         
         # Gestione Intestazione
         prima_data = st.session_state.spese_settimana[0]["data"]
@@ -138,6 +148,7 @@ if len(st.session_state.spese_settimana) > 0:
             
             foglio[f"J{riga_corrente}"] = spesa["importo"]
             
+            # Assicuriamoci che il font non sia in grassetto per i dati inseriti
             for col in ["A", "B", "C", "D", "G", "H", "I", "J"]:
                 foglio[f"{col}{riga_corrente}"].font = font_normale
             
