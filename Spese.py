@@ -1,5 +1,6 @@
 import streamlit as st
 import openpyxl
+from openpyxl.styles import Font
 from io import BytesIO
 import datetime
 
@@ -17,13 +18,12 @@ with st.form("form_spese"):
     st.markdown("---")
     st.markdown("### Dettagli Importo")
     
-    # Questo banner evidenzia l'opzione usata il 95% delle volte
     st.info("💡 **Fatture - Carta di Credito Nominale** è selezionata di default!")
     
     tipo_spesa = st.selectbox(
         "Seleziona la colonna di destinazione",
         options=[
-            "Fatture - Carta di Credito Nominale (Colonna H)", # Indice 0 = Default
+            "Fatture - Carta di Credito Nominale (Colonna H)",
             "Scontrini - Carta di Credito Nominale (Colonna G)",
             "Scontrini - Contanti (Colonna C)",
             "Fatture - Contanti (Colonna D)",
@@ -47,8 +47,26 @@ if submit:
             workbook = openpyxl.load_workbook("modello_spese.xlsx")
             foglio = workbook.active
             
-            # 2. Trova la prima riga vuota a partire dalla riga 3
-            riga_vuota = 3
+            # --- NOVITÀ: GESTIONE INTESTAZIONE (SETTIMANA E ANNO) ---
+            # Calcola il numero della settimana e l'anno dalla data inserita
+            numero_settimana = data_input.isocalendar()[1]
+            anno = data_input.year
+            testo_intestazione = f"COME DA ESTRATTI CONTO: settimana n. {numero_settimana} anno {anno}"
+            
+            # Cerca la cella nella prima riga (tra C1 e J1) e la aggiorna in NERETTO
+            for col in range(3, 11): # Dalla colonna C(3) alla J(10)
+                cella = foglio.cell(row=1, column=col)
+                if cella.value is not None and "COME DA ESTRATTI CONTO" in str(cella.value):
+                    cella.value = testo_intestazione
+                    cella.font = Font(bold=True)
+                    break
+            else:
+                # Se per qualche motivo non la trova, la scrive in E1 come sicurezza
+                foglio["E1"] = testo_intestazione
+                foglio["E1"].font = Font(bold=True)
+
+            # --- NOVITÀ: INIZIA DALLA RIGA 4 ---
+            riga_vuota = 4
             while foglio[f"A{riga_vuota}"].value is not None:
                 riga_vuota += 1
             
@@ -56,7 +74,7 @@ if submit:
             foglio[f"A{riga_vuota}"] = data_input.strftime("%d/%m/%Y")
             foglio[f"B{riga_vuota}"] = motivazione
             
-            # 4. Inserimento dell'importo SOLO nella colonna scelta (le altre restano vuote)
+            # 4. Inserimento dell'importo SOLO nella colonna scelta
             if "Colonna H" in tipo_spesa:
                 foglio[f"H{riga_vuota}"] = importo
             elif "Colonna G" in tipo_spesa:
@@ -70,6 +88,12 @@ if submit:
             
             # 5. Inserimento dello STESSO importo nella colonna J (Totale di riga)
             foglio[f"J{riga_vuota}"] = importo
+            
+            # --- NOVITÀ: TOGLIE IL NERETTO DALLA RIGA INSERITA ---
+            font_normale = Font(bold=False)
+            colonne_da_sistemare = ["A", "B", "C", "D", "G", "H", "I", "J"]
+            for col in colonne_da_sistemare:
+                foglio[f"{col}{riga_vuota}"].font = font_normale
             
             # 6. Salva il file nella memoria temporanea per il download
             output = BytesIO()
