@@ -22,7 +22,7 @@ HEADERS = {
     "Content-Type": "application/json"
 }
 
-# --- 2. FUNZIONI DI MEMORIA E FOTO MIGLIORATE (Con Timeout) ---
+# --- 2. FUNZIONI DI MEMORIA E FOTO (Migliorate e Sbloccate) ---
 def salva_spese(lista_spese):
     dati_da_salvare = []
     for spesa in lista_spese:
@@ -30,10 +30,15 @@ def salva_spese(lista_spese):
         spesa_copia["data"] = spesa_copia["data"].strftime("%Y-%m-%d")
         dati_da_salvare.append(spesa_copia)
     try:
-        # 🟢 Aggiunto timeout=3: se ci mette più di 3 secondi, non bloccare l'app
-        requests.put(URL_JSONBIN, json=dati_da_salvare, headers=HEADERS, timeout=3)
-    except Exception:
-        pass 
+        res = requests.put(URL_JSONBIN, json=dati_da_salvare, headers=HEADERS, timeout=5)
+        if res.status_code == 200:
+            return True
+        else:
+            st.error(f"Errore dal server: {res.text}")
+            return False
+    except Exception as e:
+        st.error(f"Errore di connessione: {e}")
+        return False
 
 def carica_spese():
     try:
@@ -83,10 +88,6 @@ st.title("Gestione Nota Spese 📝")
 if "spese_settimana" not in st.session_state:
     st.session_state.spese_settimana = carica_spese()
 
-def elimina_spesa(indice):
-    st.session_state.spese_settimana.pop(indice)
-    salva_spese(st.session_state.spese_settimana)
-
 # --- 4. INSERIMENTO DATI ---
 with st.form("form_spese", clear_on_submit=True):
     data_input = st.date_input("Data della spesa", datetime.date.today())
@@ -122,8 +123,12 @@ if submit:
             "foto_url": foto_url 
         }
         st.session_state.spese_settimana.append(nuova_spesa)
-        salva_spese(st.session_state.spese_settimana)
-        st.success("✅ Spesa aggiunta alla lista!")
+        
+        with st.spinner("💾 Salvataggio nel cloud..."):
+            successo = salva_spese(st.session_state.spese_settimana)
+            
+        if successo:
+            st.toast("✅ Spesa aggiunta e salvata!", icon="☁️")
         st.rerun()
 
 # --- 5. MOSTRA SPESE E PULSANTI ---
@@ -131,13 +136,19 @@ if len(st.session_state.spese_settimana) > 0:
     st.markdown("---")
     st.markdown("### 🛒 Spese inserite finora:")
     
+    # 🟢 NUOVO METODO DI ELIMINAZIONE PIÙ SOLIDO
     for i, spesa in enumerate(st.session_state.spese_settimana):
         col_testo, col_bottone = st.columns([5, 1])
         with col_testo:
             icona = " 📷" if spesa.get("foto_url") else ""
             st.write(f"**{i+1}.** {spesa['data'].strftime('%d/%m/%Y')} - {spesa['motivazione']} | **{spesa['importo']:.2f}€**{icona}")
         with col_bottone:
-            st.button("❌", key=f"elimina_{i}", on_click=elimina_spesa, args=(i,))
+            # Rimosso on_click, usiamo il bottone in modo diretto
+            if st.button("❌", key=f"del_btn_{i}_{spesa['importo']}"):
+                st.session_state.spese_settimana.pop(i)
+                salva_spese(st.session_state.spese_settimana)
+                st.toast("🗑️ Spesa eliminata!", icon="✅")
+                st.rerun()
 
     totale_settimana = sum(spesa["importo"] for spesa in st.session_state.spese_settimana)
     st.markdown(f"## 💶 Totale Settimana: **{totale_settimana:.2f} €**")
@@ -148,27 +159,21 @@ if len(st.session_state.spese_settimana) > 0:
     
     if len(spese_con_foto) > 0:
         if st.button("📄 Crea PDF degli Scontrini"):
-            with st.spinner("⏳ Preparazione del PDF in corso (potrebbe volerci qualche secondo)..."):
+            with st.spinner("⏳ Preparazione del PDF in corso..."):
                 pdf = FPDF(orientation="L", unit="mm", format="A4") 
-                
                 for i in range(0, len(spese_con_foto), 3):
                     pdf.add_page()
                     pdf.set_font("Helvetica", size=10)
-                    
                     gruppo_spese = spese_con_foto[i:i+3]
-                    x_start = 10  
-                    larghezza_foto = 85  
-                    spazio = 10   
+                    x_start, larghezza_foto, spazio = 10, 85, 10   
                     
                     for indice_foto, spesa_corrente in enumerate(gruppo_spese):
                         x_posizione = x_start + indice_foto * (larghezza_foto + spazio)
-                        
                         pdf.set_xy(x_posizione, 10)
                         testo_etichetta = f"{spesa_corrente['data'].strftime('%d/%m/%Y')} - {spesa_corrente['importo']} EUR"
                         pdf.cell(w=larghezza_foto, h=10, text=testo_etichetta, align="C")
                         pdf.set_xy(x_posizione, 15)
-                        mot_breve = spesa_corrente['motivazione'][:30]
-                        pdf.cell(w=larghezza_foto, h=10, text=mot_breve, align="C")
+                        pdf.cell(w=larghezza_foto, h=10, text=spesa_corrente['motivazione'][:30], align="C")
                         
                         try:
                             req = requests.get(spesa_corrente["foto_url"], timeout=10)
@@ -179,12 +184,7 @@ if len(st.session_state.spese_settimana) > 0:
                             pdf.cell(w=larghezza_foto, h=10, text="Errore caricamento foto", align="C")
 
                 pdf_bytes = pdf.output()
-                st.download_button(
-                    label="⬇️ Scarica il file PDF",
-                    data=bytes(pdf_bytes),
-                    file_name="scontrini_settimana.pdf",
-                    mime="application/pdf"
-                )
+                st.download_button(label="⬇️ Scarica il file PDF", data=bytes(pdf_bytes), file_name="scontrini_settimana.pdf", mime="application/pdf")
         st.markdown("---")
 
     # ---------------- GENERAZIONE EXCEL ----------------
@@ -199,8 +199,7 @@ if len(st.session_state.spese_settimana) > 0:
         
         prima_data = st.session_state.spese_settimana[0]["data"]
         numero_settimana = prima_data.isocalendar()[1]
-        anno = prima_data.year
-        testo_intestazione = f"COME DA ESTRATTI CONTO: settimana n. {numero_settimana} anno {anno}"
+        testo_intestazione = f"COME DA ESTRATTI CONTO: settimana n. {numero_settimana} anno {prima_data.year}"
         
         for col in range(3, 11): 
             cella = foglio.cell(row=1, column=col)
@@ -233,23 +232,15 @@ if len(st.session_state.spese_settimana) > 0:
         workbook.save(output_excel)
         output_excel.seek(0)
         
-        st.download_button(
-            label="⬇️ Scarica la Nota Spese in Excel",
-            data=output_excel,
-            file_name=f"nota_spese_settimana_{numero_settimana}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-
+        st.download_button(label="⬇️ Scarica la Nota Spese in Excel", data=output_excel, file_name=f"nota_spese_settimana_{numero_settimana}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         st.markdown("---")
-        with st.popover("🗑️ Svuota la intera lista e inizia una nuova settimana"):
-            st.warning("⚠️ Sei sicuro?")
-            if st.button("Sì, cancella tutto", type="primary"):
-                # 🟢 Aggiunto uno spinner visivo per far capire all'utente che sta caricando
-                with st.spinner("⏳ Svuotamento del database in corso..."):
-                    st.session_state.spese_settimana = []
-                    salva_spese([])
-                st.success("Lista svuotata!")
-                st.rerun()
+        
+        # 🟢 NUOVO PULSANTE SVUOTA TUTTO
+        st.warning("Vuoi azzerare la settimana?")
+        if st.button("🗑️ Svuota la intera lista e inizia una nuova settimana", type="primary"):
+            st.session_state.spese_settimana = []
+            salva_spese([])
+            st.rerun()
             
     except FileNotFoundError:
         st.error("❌ ERRORE: Non trovo il file 'modello_spese.xlsx' su GitHub.")
