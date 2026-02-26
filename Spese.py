@@ -22,26 +22,22 @@ HEADERS = {
 
 # --- 2. FUNZIONI DI MEMORIA ---
 def salva_spese(lista_spese):
-    # Trasformiamo le date in testo per inviarle su internet
     dati_da_salvare = []
     for spesa in lista_spese:
         spesa_copia = spesa.copy()
         spesa_copia["data"] = spesa_copia["data"].strftime("%Y-%m-%d")
         dati_da_salvare.append(spesa_copia)
         
-    # Inviamo il salvataggio al nostro cassetto JSONBin
     try:
         requests.put(URL_JSONBIN, json=dati_da_salvare, headers=HEADERS)
     except Exception:
         st.error("⚠️ Errore di connessione: impossibile salvare su internet.")
 
 def carica_spese():
-    # Scarichiamo i dati all'avvio dell'app
     try:
         risposta = requests.get(URL_JSONBIN, headers=HEADERS)
         if risposta.status_code == 200:
             dati_caricati = risposta.json().get("record", [])
-            # Ritrasformiamo il testo in vere Date per Python
             for spesa in dati_caricati:
                 spesa["data"] = datetime.datetime.strptime(spesa["data"], "%Y-%m-%d").date()
             return dati_caricati
@@ -116,7 +112,7 @@ if submit:
             "importo": importo
         }
         st.session_state.spese_settimana.append(nuova_spesa)
-        salva_spese(st.session_state.spese_settimana) # Salviamo subito in cloud
+        salva_spese(st.session_state.spese_settimana)
         st.success("✅ Spesa aggiunta alla lista!")
         st.rerun()
 
@@ -128,7 +124,7 @@ if len(st.session_state.spese_settimana) > 0:
     for i, spesa in enumerate(st.session_state.spese_settimana):
         col_testo, col_bottone = st.columns([5, 1])
         with col_testo:
-            st.write(f"**{i+1}.** {spesa['data'].strftime('%d/%m/%Y')} - {spesa['motivazione']} | **{spesa['importo']:.2f}€** *(Destinazione: {spesa['tipo'].split(' (')[0]})*")
+            st.write(f"**{i+1}.** {spesa['data'].strftime('%d/%m/%Y')} - {spesa['motivazione']} | **{spesa['importo']:.2f}€**")
         with col_bottone:
             st.button("❌ Elimina", key=f"elimina_{i}", on_click=elimina_spesa, args=(i,))
 
@@ -141,21 +137,13 @@ if len(st.session_state.spese_settimana) > 0:
     try:
         workbook = openpyxl.load_workbook("modello_spese.xlsx")
         foglio = workbook.active
-        
         foglio.insert_rows(14, amount=3)
         
-        bordo_sottile = Border(
-            left=Side(style='thin'), 
-            right=Side(style='thin'), 
-            top=Side(style='thin'), 
-            bottom=Side(style='thin')
-        )
-        
+        bordo_sottile = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
         for riga in range(4, 17):
             for col in ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]:
                 foglio[f"{col}{riga}"].border = bordo_sottile
         
-        # Gestione Intestazione
         prima_data = st.session_state.spese_settimana[0]["data"]
         numero_settimana = prima_data.isocalendar()[1]
         anno = prima_data.year
@@ -172,23 +160,17 @@ if len(st.session_state.spese_settimana) > 0:
             foglio["E1"].font = Font(bold=True)
 
         riga_corrente = 4
-        font_normale = Font(bold=False)
-
         for spesa in st.session_state.spese_settimana:
             foglio[f"A{riga_corrente}"] = spesa["data"].strftime("%d/%m/%Y")
             foglio[f"B{riga_corrente}"] = spesa["motivazione"]
-            
             if "Colonna H" in spesa["tipo"]: foglio[f"H{riga_corrente}"] = spesa["importo"]
             elif "Colonna G" in spesa["tipo"]: foglio[f"G{riga_corrente}"] = spesa["importo"]
             elif "Colonna C" in spesa["tipo"]: foglio[f"C{riga_corrente}"] = spesa["importo"]
             elif "Colonna D" in spesa["tipo"]: foglio[f"D{riga_corrente}"] = spesa["importo"]
             elif "Colonna I" in spesa["tipo"]: foglio[f"I{riga_corrente}"] = spesa["importo"]
-            
             foglio[f"J{riga_corrente}"] = spesa["importo"]
-            
             for col in ["A", "B", "C", "D", "G", "H", "I", "J"]:
-                foglio[f"{col}{riga_corrente}"].font = font_normale
-            
+                foglio[f"{col}{riga_corrente}"].font = Font(bold=False)
             riga_corrente += 1
         
         foglio["J17"] = totale_settimana
@@ -204,11 +186,16 @@ if len(st.session_state.spese_settimana) > 0:
             file_name=f"nota_spese_settimana_{numero_settimana}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
-        
-        if st.button("🗑️ Svuota la intera lista e inizia una nuova settimana"):
-            st.session_state.spese_settimana = []
-            salva_spese([]) # Aggiorniamo il cloud svuotando il cassetto
-            st.rerun()
+
+        st.markdown("---")
+        # --- 🟢 NUOVO: PULSANTE DI RESET CON CONFERMA (POPOVER) ---
+        with st.popover("🗑️ Svuota la intera lista e inizia una nuova settimana"):
+            st.warning("⚠️ Sei sicuro? Questa azione cancellerà permanentemente tutte le spese inserite finora.")
+            if st.button("Sì, cancella tutto definitivamente", type="primary"):
+                st.session_state.spese_settimana = []
+                salva_spese([]) # Svuota il cloud
+                st.success("Lista svuotata!")
+                st.rerun()
             
     except FileNotFoundError:
         st.error("❌ ERRORE: Non trovo il file 'modello_spese.xlsx' su GitHub.")
