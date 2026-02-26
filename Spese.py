@@ -22,29 +22,40 @@ HEADERS = {
     "Content-Type": "application/json"
 }
 
-# --- 2. FUNZIONI DI MEMORIA E FOTO (Migliorate e Sbloccate) ---
+# --- 2. FUNZIONI DI MEMORIA (AGGIORNATE CON IL TRUCCHETTO DELLA SCATOLA) ---
 def salva_spese(lista_spese):
     dati_da_salvare = []
     for spesa in lista_spese:
         spesa_copia = spesa.copy()
         spesa_copia["data"] = spesa_copia["data"].strftime("%Y-%m-%d")
         dati_da_salvare.append(spesa_copia)
+        
+    # 🟢 IL TRUCCO: Invece di mandare [], mandiamo {"spese": []}
+    payload = {"spese": dati_da_salvare}
+    
     try:
-        res = requests.put(URL_JSONBIN, json=dati_da_salvare, headers=HEADERS, timeout=5)
+        res = requests.put(URL_JSONBIN, json=payload, headers=HEADERS, timeout=5)
         if res.status_code == 200:
             return True
         else:
-            st.error(f"Errore dal server: {res.text}")
+            st.error(f"⚠️ Errore dal server JSONBin: {res.text}")
             return False
     except Exception as e:
-        st.error(f"Errore di connessione: {e}")
+        st.error(f"⚠️ Errore di connessione: {e}")
         return False
 
 def carica_spese():
     try:
         risposta = requests.get(URL_JSONBIN, headers=HEADERS, timeout=5)
         if risposta.status_code == 200:
-            dati_caricati = risposta.json().get("record", [])
+            record = risposta.json().get("record", {})
+            
+            # 🟢 Capisce sia il vecchio formato che la nuova "scatola"
+            if isinstance(record, list):
+                dati_caricati = record
+            else:
+                dati_caricati = record.get("spese", [])
+                
             for spesa in dati_caricati:
                 spesa["data"] = datetime.datetime.strptime(spesa["data"], "%Y-%m-%d").date()
             return dati_caricati
@@ -128,27 +139,28 @@ if submit:
             successo = salva_spese(st.session_state.spese_settimana)
             
         if successo:
-            st.toast("✅ Spesa aggiunta e salvata!", icon="☁️")
-        st.rerun()
+            st.rerun()
 
 # --- 5. MOSTRA SPESE E PULSANTI ---
 if len(st.session_state.spese_settimana) > 0:
     st.markdown("---")
     st.markdown("### 🛒 Spese inserite finora:")
     
-    # 🟢 NUOVO METODO DI ELIMINAZIONE PIÙ SOLIDO
     for i, spesa in enumerate(st.session_state.spese_settimana):
         col_testo, col_bottone = st.columns([5, 1])
         with col_testo:
             icona = " 📷" if spesa.get("foto_url") else ""
             st.write(f"**{i+1}.** {spesa['data'].strftime('%d/%m/%Y')} - {spesa['motivazione']} | **{spesa['importo']:.2f}€**{icona}")
         with col_bottone:
-            # Rimosso on_click, usiamo il bottone in modo diretto
-            if st.button("❌", key=f"del_btn_{i}_{spesa['importo']}"):
+            if st.button("❌", key=f"del_btn_{i}"):
+                # 🟢 Eliminiamo la riga solo se JSONBin ci dà l'ok!
+                vecchia_lista = st.session_state.spese_settimana.copy()
                 st.session_state.spese_settimana.pop(i)
-                salva_spese(st.session_state.spese_settimana)
-                st.toast("🗑️ Spesa eliminata!", icon="✅")
-                st.rerun()
+                successo = salva_spese(st.session_state.spese_settimana)
+                if successo:
+                    st.rerun()
+                else:
+                    st.session_state.spese_settimana = vecchia_lista # Rimette la riga se c'è errore
 
     totale_settimana = sum(spesa["importo"] for spesa in st.session_state.spese_settimana)
     st.markdown(f"## 💶 Totale Settimana: **{totale_settimana:.2f} €**")
@@ -235,12 +247,14 @@ if len(st.session_state.spese_settimana) > 0:
         st.download_button(label="⬇️ Scarica la Nota Spese in Excel", data=output_excel, file_name=f"nota_spese_settimana_{numero_settimana}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         st.markdown("---")
         
-        # 🟢 NUOVO PULSANTE SVUOTA TUTTO
         st.warning("Vuoi azzerare la settimana?")
         if st.button("🗑️ Svuota la intera lista e inizia una nuova settimana", type="primary"):
-            st.session_state.spese_settimana = []
-            salva_spese([])
-            st.rerun()
+            with st.spinner("⏳ Svuotamento del database in corso..."):
+                # Mandiamo una lista vuota che il codice trasformerà in {"spese": []}
+                successo = salva_spese([]) 
+                if successo:
+                    st.session_state.spese_settimana = []
+                    st.rerun()
             
     except FileNotFoundError:
         st.error("❌ ERRORE: Non trovo il file 'modello_spese.xlsx' su GitHub.")
