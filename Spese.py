@@ -22,7 +22,7 @@ HEADERS = {
     "Content-Type": "application/json"
 }
 
-# --- 2. FUNZIONI DI MEMORIA (AGGIORNATE CON IL TRUCCHETTO DELLA SCATOLA) ---
+# --- 2. FUNZIONI DI MEMORIA E FOTO ---
 def salva_spese(lista_spese):
     dati_da_salvare = []
     for spesa in lista_spese:
@@ -30,7 +30,6 @@ def salva_spese(lista_spese):
         spesa_copia["data"] = spesa_copia["data"].strftime("%Y-%m-%d")
         dati_da_salvare.append(spesa_copia)
         
-    # 🟢 IL TRUCCO: Invece di mandare [], mandiamo {"spese": []}
     payload = {"spese": dati_da_salvare}
     
     try:
@@ -49,8 +48,6 @@ def carica_spese():
         risposta = requests.get(URL_JSONBIN, headers=HEADERS, timeout=5)
         if risposta.status_code == 200:
             record = risposta.json().get("record", {})
-            
-            # 🟢 Capisce sia il vecchio formato che la nuova "scatola"
             if isinstance(record, list):
                 dati_caricati = record
             else:
@@ -65,10 +62,17 @@ def carica_spese():
 
 def carica_foto_imgbb(foto_bytes):
     url = "https://api.imgbb.com/1/upload"
-    payload = {"key": IMGBB_KEY}
+    
+    # 🟢 AGGIUNTA L'AUTODISTRUZIONE: 2592000 secondi = esattamente 30 giorni
+    payload = {
+        "key": IMGBB_KEY,
+        "expiration": 2592000  
+    }
+    
     files = {"image": foto_bytes}
     try:
-        res = requests.post(url, data=payload, files=files, timeout=10)
+        # Timeout aumentato a 15 secondi per dare tempo al telefono di inviare la foto
+        res = requests.post(url, data=payload, files=files, timeout=15) 
         if res.status_code == 200:
             return res.json()["data"]["url"]
     except Exception:
@@ -153,14 +157,13 @@ if len(st.session_state.spese_settimana) > 0:
             st.write(f"**{i+1}.** {spesa['data'].strftime('%d/%m/%Y')} - {spesa['motivazione']} | **{spesa['importo']:.2f}€**{icona}")
         with col_bottone:
             if st.button("❌", key=f"del_btn_{i}"):
-                # 🟢 Eliminiamo la riga solo se JSONBin ci dà l'ok!
                 vecchia_lista = st.session_state.spese_settimana.copy()
                 st.session_state.spese_settimana.pop(i)
                 successo = salva_spese(st.session_state.spese_settimana)
                 if successo:
                     st.rerun()
                 else:
-                    st.session_state.spese_settimana = vecchia_lista # Rimette la riga se c'è errore
+                    st.session_state.spese_settimana = vecchia_lista 
 
     totale_settimana = sum(spesa["importo"] for spesa in st.session_state.spese_settimana)
     st.markdown(f"## 💶 Totale Settimana: **{totale_settimana:.2f} €**")
@@ -250,7 +253,6 @@ if len(st.session_state.spese_settimana) > 0:
         st.warning("Vuoi azzerare la settimana?")
         if st.button("🗑️ Svuota la intera lista e inizia una nuova settimana", type="primary"):
             with st.spinner("⏳ Svuotamento del database in corso..."):
-                # Mandiamo una lista vuota che il codice trasformerà in {"spese": []}
                 successo = salva_spese([]) 
                 if successo:
                     st.session_state.spese_settimana = []
