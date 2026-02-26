@@ -23,13 +23,13 @@ with st.form("form_spese"):
     tipo_spesa = st.selectbox(
         "Seleziona la colonna di destinazione",
         options=[
-            "Fatture - Carta di Credito Nominale (Colonna H)", # Usato il 95% delle volte (Indice 0 = Default)
+            "Fatture - Carta di Credito Nominale (Colonna H)", # Indice 0 = Default
             "Scontrini - Carta di Credito Nominale (Colonna G)",
             "Scontrini - Contanti (Colonna C)",
             "Fatture - Contanti (Colonna D)",
             "Fatture - Bonifico (Colonna I)"
         ],
-        index=0 # Seleziona automaticamente la prima opzione
+        index=0 
     )
     
     importo = st.number_input("Importo in Euro (€)", min_value=0.0, step=0.01, format="%.2f")
@@ -43,7 +43,7 @@ if submit:
         st.warning("⚠️ Per favore, inserisci una motivazione e un importo maggiore di zero.")
     else:
         try:
-            # 1. Carica il file Excel (deve essere .xlsx!)
+            # 1. Carica il file Excel
             workbook = openpyxl.load_workbook("modello_spese.xlsx")
             foglio = workbook.active
             
@@ -56,7 +56,7 @@ if submit:
             foglio[f"A{riga_vuota}"] = data_input.strftime("%d/%m/%Y")
             foglio[f"B{riga_vuota}"] = motivazione
             
-            # 4. Inserimento dell'importo nella colonna corretta in base alla tendina
+            # 4. Inserimento dell'importo SOLO nella colonna scelta (le altre restano vuote)
             if "Colonna H" in tipo_spesa:
                 foglio[f"H{riga_vuota}"] = importo
             elif "Colonna G" in tipo_spesa:
@@ -68,11 +68,10 @@ if submit:
             elif "Colonna I" in tipo_spesa:
                 foglio[f"I{riga_vuota}"] = importo
             
-            # 5. Inserimento della formula del Totale (Col J)
-            # Somma tutto dalla colonna C alla colonna I per quella specifica riga
-            foglio[f"J{riga_vuota}"] = f"=SUM(C{riga_vuota}:I{riga_vuota})"
+            # 5. Inserimento dello STESSO importo nella colonna J (Totale di riga)
+            foglio[f"J{riga_vuota}"] = importo
             
-            # 6. Salva il file nella memoria temporanea per permetterne il download
+            # 6. Salva il file nella memoria temporanea per il download
             output = BytesIO()
             workbook.save(output)
             output.seek(0)
@@ -88,4 +87,4 @@ if submit:
             )
             
         except FileNotFoundError:
-            st.error("❌ ERRORE: Non trovo il file 'modello_spese.xlsx'. Assicurati di averlo convertito da .xls in .xlsx e che si chiami esattamente così!")
+            st.error("❌ ERRORE: Non trovo il file 'modello_spese.xlsx'. Assicurati che sia presente e si chiami esattamente così.")
