@@ -7,13 +7,22 @@ import datetime
 # Impostazioni della pagina
 st.set_page_config(page_title="Compilazione Note Spese", page_icon="💶")
 
-# --- TRUCCHETTO CSS PER IL COLORE VERDE ---
+# --- TRUCCHETTO CSS MIGLIORATO ---
 st.markdown(
     """
     <style>
-    /* Colora di verde chiaro lo sfondo delle caselle di input (testo e numeri) */
-    div[data-baseweb="input"] > div {
+    /* Colora di verde SOLO le caselle di Testo (Motivazione) e Numero (Importo), ignorando la Data */
+    div[data-testid="stTextInput"] div[data-baseweb="input"] > div,
+    div[data-testid="stNumberInput"] div[data-baseweb="input"] > div {
         background-color: #e8f5e9 !important; 
+    }
+    
+    /* Forza il colore del testo a NERO in quelle specifiche caselle per renderlo visibile */
+    div[data-testid="stTextInput"] input,
+    div[data-testid="stNumberInput"] input {
+        color: black !important;
+        -webkit-text-fill-color: black !important;
+        font-weight: bold;
     }
     </style>
     """,
@@ -29,15 +38,14 @@ if "spese_settimana" not in st.session_state:
 
 # Creiamo un "Form" per inserire i dati
 with st.form("form_spese"):
+    # La data torna normale (non toccata dal CSS)
     data_input = st.date_input("Data della spesa", datetime.date.today())
     
-    # La casella sarà verde grazie al CSS
+    # Casella verde con testo nero
     motivazione = st.text_input("Motivazione (es. Pranzo Cliente Rossi)")
     
     st.markdown("---")
     st.markdown("### Dettagli Importo")
-    
-    # Rimosso il banner luminoso come richiesto
     
     tipo_spesa = st.selectbox(
         "Seleziona la colonna di destinazione",
@@ -51,8 +59,7 @@ with st.form("form_spese"):
         index=0 
     )
     
-    # Impostando value=None, il campo parte vuoto
-    # La casella sarà verde grazie al CSS
+    # Casella verde con testo nero, parte vuota
     importo = st.number_input("Importo in Euro (€)", min_value=0.0, step=0.01, format="%.2f", value=None)
     
     # Pulsante per salvare la spesa nella memoria
@@ -60,7 +67,6 @@ with st.form("form_spese"):
 
 # Cosa succede quando premi il pulsante di aggiunta
 if submit:
-    # Aggiornato il controllo per gestire il caso in cui importo sia vuoto (None)
     if motivazione == "" or importo is None or importo <= 0.0:
         st.warning("⚠️ Per favore, inserisci una motivazione e un importo maggiore di zero.")
     else:
