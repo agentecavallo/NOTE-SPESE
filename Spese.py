@@ -5,13 +5,13 @@ from io import BytesIO
 import datetime
 import requests
 import json
-from fpdf import FPDF  # La libreria magica per i PDF
+from fpdf import FPDF
 
 # --- 1. CONFIGURAZIONE CLOUD E CHIAVI ---
 try:
     BIN_ID = st.secrets["JSONBIN_ID"]
     API_KEY = st.secrets["JSONBIN_KEY"]
-    IMGBB_KEY = st.secrets["IMGBB_KEY"] # 🟢 NUOVA CHIAVE PER LE FOTO
+    IMGBB_KEY = st.secrets["IMGBB_KEY"]
 except KeyError:
     st.error("⚠️ Attenzione: Mancano alcune chiavi segrete in Streamlit Cloud (Settings > Secrets)!")
     st.stop()
@@ -22,7 +22,7 @@ HEADERS = {
     "Content-Type": "application/json"
 }
 
-# --- 2. FUNZIONI DI MEMORIA E FOTO ---
+# --- 2. FUNZIONI DI MEMORIA E FOTO MIGLIORATE (Con Timeout) ---
 def salva_spese(lista_spese):
     dati_da_salvare = []
     for spesa in lista_spese:
@@ -30,13 +30,14 @@ def salva_spese(lista_spese):
         spesa_copia["data"] = spesa_copia["data"].strftime("%Y-%m-%d")
         dati_da_salvare.append(spesa_copia)
     try:
-        requests.put(URL_JSONBIN, json=dati_da_salvare, headers=HEADERS)
+        # 🟢 Aggiunto timeout=3: se ci mette più di 3 secondi, non bloccare l'app
+        requests.put(URL_JSONBIN, json=dati_da_salvare, headers=HEADERS, timeout=3)
     except Exception:
-        pass
+        pass 
 
 def carica_spese():
     try:
-        risposta = requests.get(URL_JSONBIN, headers=HEADERS)
+        risposta = requests.get(URL_JSONBIN, headers=HEADERS, timeout=5)
         if risposta.status_code == 200:
             dati_caricati = risposta.json().get("record", [])
             for spesa in dati_caricati:
@@ -46,14 +47,16 @@ def carica_spese():
         pass
     return []
 
-# 🟢 NUOVO: Funzione per caricare la foto di nascosto su ImgBB
 def carica_foto_imgbb(foto_bytes):
     url = "https://api.imgbb.com/1/upload"
     payload = {"key": IMGBB_KEY}
     files = {"image": foto_bytes}
-    res = requests.post(url, data=payload, files=files)
-    if res.status_code == 200:
-        return res.json()["data"]["url"]
+    try:
+        res = requests.post(url, data=payload, files=files, timeout=10)
+        if res.status_code == 200:
+            return res.json()["data"]["url"]
+    except Exception:
+        pass
     return None
 
 # --- 3. IMPOSTAZIONI PAGINA E GRAFICA ---
@@ -84,8 +87,7 @@ def elimina_spesa(indice):
     st.session_state.spese_settimana.pop(indice)
     salva_spese(st.session_state.spese_settimana)
 
-# --- 4. INSERIMENTO DATI (CON FOTOCAMERA) ---
-# Il parametro clear_on_submit=True svuota i campi dopo aver premuto il bottone
+# --- 4. INSERIMENTO DATI ---
 with st.form("form_spese", clear_on_submit=True):
     data_input = st.date_input("Data della spesa", datetime.date.today())
     motivazione = st.text_input("Motivazione (es. Pranzo Cliente Rossi)")
@@ -99,7 +101,6 @@ with st.form("form_spese", clear_on_submit=True):
     importo = st.number_input("Importo in Euro (€)", min_value=0.0, step=0.01, format="%.2f", value=None)
     
     st.markdown("---")
-    # 🟢 NUOVO: La fotocamera per il telefono!
     foto_scontrino = st.camera_input("📸 Scatta foto allo scontrino (Opzionale)")
     
     submit = st.form_submit_button("➕ Aggiungi alla lista della settimana")
@@ -110,7 +111,7 @@ if submit:
     else:
         foto_url = None
         if foto_scontrino is not None:
-            with st.spinner("⏳ Sto caricando la foto dello scontrino..."):
+            with st.spinner("⏳ Caricamento foto in corso..."):
                 foto_url = carica_foto_imgbb(foto_scontrino.getvalue())
         
         nuova_spesa = {
@@ -118,14 +119,14 @@ if submit:
             "motivazione": motivazione,
             "tipo": tipo_spesa,
             "importo": importo,
-            "foto_url": foto_url # Salviamo il link della foto
+            "foto_url": foto_url 
         }
         st.session_state.spese_settimana.append(nuova_spesa)
         salva_spese(st.session_state.spese_settimana)
         st.success("✅ Spesa aggiunta alla lista!")
         st.rerun()
 
-# --- 5. MOSTRA SPESE, EXCEL E PDF ---
+# --- 5. MOSTRA SPESE E PULSANTI ---
 if len(st.session_state.spese_settimana) > 0:
     st.markdown("---")
     st.markdown("### 🛒 Spese inserite finora:")
@@ -133,7 +134,6 @@ if len(st.session_state.spese_settimana) > 0:
     for i, spesa in enumerate(st.session_state.spese_settimana):
         col_testo, col_bottone = st.columns([5, 1])
         with col_testo:
-            # 🟢 Mostriamo l'icona della macchina fotografica se c'è uno scontrino
             icona = " 📷" if spesa.get("foto_url") else ""
             st.write(f"**{i+1}.** {spesa['data'].strftime('%d/%m/%Y')} - {spesa['motivazione']} | **{spesa['importo']:.2f}€**{icona}")
         with col_bottone:
@@ -148,43 +148,36 @@ if len(st.session_state.spese_settimana) > 0:
     
     if len(spese_con_foto) > 0:
         if st.button("📄 Crea PDF degli Scontrini"):
-            with st.spinner("⏳ Preparazione del PDF in corso..."):
-                pdf = FPDF(orientation="L", unit="mm", format="A4") # L = Landscape (Orizzontale)
+            with st.spinner("⏳ Preparazione del PDF in corso (potrebbe volerci qualche secondo)..."):
+                pdf = FPDF(orientation="L", unit="mm", format="A4") 
                 
-                # Dividiamo le foto a gruppi di 3
                 for i in range(0, len(spese_con_foto), 3):
                     pdf.add_page()
                     pdf.set_font("Helvetica", size=10)
                     
                     gruppo_spese = spese_con_foto[i:i+3]
-                    
-                    x_start = 10  # Margine sinistro
-                    larghezza_foto = 85  # Ogni foto prende 85mm
-                    spazio = 10   # Spazio bianco tra una foto e l'altra
+                    x_start = 10  
+                    larghezza_foto = 85  
+                    spazio = 10   
                     
                     for indice_foto, spesa_corrente in enumerate(gruppo_spese):
-                        # Calcoliamo dove posizionare questa foto (asse X)
                         x_posizione = x_start + indice_foto * (larghezza_foto + spazio)
                         
-                        # Scriviamo il testo sopra la foto
                         pdf.set_xy(x_posizione, 10)
                         testo_etichetta = f"{spesa_corrente['data'].strftime('%d/%m/%Y')} - {spesa_corrente['importo']} EUR"
                         pdf.cell(w=larghezza_foto, h=10, text=testo_etichetta, align="C")
                         pdf.set_xy(x_posizione, 15)
-                        # Tagliamo la motivazione se è troppo lunga
                         mot_breve = spesa_corrente['motivazione'][:30]
                         pdf.cell(w=larghezza_foto, h=10, text=mot_breve, align="C")
                         
-                        # Scarichiamo la foto da internet e la incolliamo
                         try:
-                            req = requests.get(spesa_corrente["foto_url"])
+                            req = requests.get(spesa_corrente["foto_url"], timeout=10)
                             img_bytes = BytesIO(req.content)
                             pdf.image(img_bytes, x=x_posizione, y=25, w=larghezza_foto)
                         except Exception:
                             pdf.set_xy(x_posizione, 50)
                             pdf.cell(w=larghezza_foto, h=10, text="Errore caricamento foto", align="C")
 
-                # Generiamo il file PDF finito
                 pdf_bytes = pdf.output()
                 st.download_button(
                     label="⬇️ Scarica il file PDF",
@@ -249,10 +242,12 @@ if len(st.session_state.spese_settimana) > 0:
 
         st.markdown("---")
         with st.popover("🗑️ Svuota la intera lista e inizia una nuova settimana"):
-            st.warning("⚠️ Sei sicuro? Cancellerà le spese inserite finora (le foto su ImgBB rimarranno salvate nei loro server, ma spariranno da questa app).")
+            st.warning("⚠️ Sei sicuro?")
             if st.button("Sì, cancella tutto", type="primary"):
-                st.session_state.spese_settimana = []
-                salva_spese([])
+                # 🟢 Aggiunto uno spinner visivo per far capire all'utente che sta caricando
+                with st.spinner("⏳ Svuotamento del database in corso..."):
+                    st.session_state.spese_settimana = []
+                    salva_spese([])
                 st.success("Lista svuotata!")
                 st.rerun()
             
