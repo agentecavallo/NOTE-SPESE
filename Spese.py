@@ -7,7 +7,7 @@ import requests
 import json
 import base64
 from fpdf import FPDF
-from PIL import Image  # 🟢 NUOVO: La libreria per comprimere le foto!
+from PIL import Image, ImageOps  # 🟢 NUOVO: Aggiunto ImageOps per raddrizzare le foto!
 
 # --- 1. CONFIGURAZIONE CLOUD E CHIAVI ---
 try:
@@ -73,7 +73,6 @@ def carica_foto_imgbb(foto_bytes):
     }
     
     try:
-        # Ora che la foto è leggera, 15 secondi bastano e avanzano!
         res = requests.post(url, data=payload, timeout=15) 
         if res.status_code == 200:
             return res.json()["data"]["url"]
@@ -131,23 +130,21 @@ if submit:
     else:
         foto_url = None
         if foto_scontrino is not None:
-            with st.spinner("⏳ Compressione e caricamento foto in corso..."):
-                # 🟢 MAGIA DELLA COMPRESSIONE QUI!
+            with st.spinner("⏳ Compressione e raddrizzamento foto in corso..."):
                 immagine_originale = Image.open(foto_scontrino)
                 
-                # Assicuriamoci che i colori siano giusti (evita problemi coi file PNG)
+                # 🟢 MAGIA DELLA ROTAZIONE: raddrizza la foto leggendo l'etichetta del telefono!
+                immagine_originale = ImageOps.exif_transpose(immagine_originale)
+                
                 if immagine_originale.mode in ("RGBA", "P"):
                     immagine_originale = immagine_originale.convert("RGB")
                 
-                # Ridimensioniamo la foto (max 1200 pixel di larghezza/altezza) - perfetto per i PDF!
                 immagine_originale.thumbnail((1200, 1200))
                 
-                # Salviamo l'immagine compressa in una "memoria virtuale" temporanea (Buffer)
                 buffer = BytesIO()
-                immagine_originale.save(buffer, format="JPEG", quality=75) # Qualità 75% è l'equilibrio magico
+                immagine_originale.save(buffer, format="JPEG", quality=75) 
                 foto_compressa_bytes = buffer.getvalue()
                 
-                # Invia a ImgBB il file compresso, non l'originale gigante!
                 foto_url = carica_foto_imgbb(foto_compressa_bytes)
                 
                 if foto_url is None:
@@ -215,9 +212,9 @@ if len(st.session_state.spese_settimana) > 0:
                         pdf.cell(w=larghezza_foto, h=10, text=spesa_corrente['motivazione'][:30], align="C")
                         
                         try:
-                            # Adesso le foto sono leggere, si scaricheranno in un attimo
                             req = requests.get(spesa_corrente["foto_url"], timeout=10)
                             img_bytes = BytesIO(req.content)
+                            # Ora la foto sarà dritta come un fuso!
                             pdf.image(img_bytes, x=x_posizione, y=25, w=larghezza_foto)
                         except Exception as e:
                             pdf.set_xy(x_posizione, 50)
