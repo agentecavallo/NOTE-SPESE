@@ -11,7 +11,6 @@ from fpdf import FPDF
 from PIL import Image, ImageOps
 
 # --- 1. L'ARTIGLIERIA PESANTE CONTRO LA TASTIERA ---
-# Usiamo un MutationObserver per tenere la tastiera abbassata SEMPRE
 components.html(
     """
     <script>
@@ -143,7 +142,6 @@ with st.form("form_spese", clear_on_submit=True):
     importo = st.number_input("Importo in Euro (€)", min_value=0.0, step=0.01, format="%.2f", value=None)
     
     st.markdown("---")
-    # Ho aggiunto 'heic' ai tipi per forzare il telefono (specialmente iOS) a riconoscere meglio la fotocamera
     foto_scontrino = st.file_uploader("📸 Scatta o allega foto scontrino", type=["png", "jpg", "jpeg", "heic"])
     
     submit = st.form_submit_button("➕ Aggiungi alla lista della settimana")
@@ -247,7 +245,18 @@ if len(st.session_state.spese_settimana) > 0:
                             pdf.cell(w=larghezza_foto, h=10, text="Errore caricamento foto", align="C")
 
                 pdf_bytes = pdf.output()
-                st.download_button(label="⬇️ Scarica il file PDF", data=bytes(pdf_bytes), file_name="scontrini_settimana.pdf", mime="application/pdf")
+                
+                # 🟢 NUOVO: Calcoliamo il nome file del PDF in base alla settimana!
+                prima_data = st.session_state.spese_settimana[0]["data"]
+                numero_settimana = prima_data.isocalendar()[1]
+                nome_file_pdf = f"Scontrini_Settimana_{numero_settimana}.pdf"
+                
+                st.download_button(
+                    label="⬇️ Scarica il file PDF", 
+                    data=bytes(pdf_bytes), 
+                    file_name=nome_file_pdf, 
+                    mime="application/pdf"
+                )
         st.markdown("---")
 
     # ---------------- GENERAZIONE EXCEL ----------------
