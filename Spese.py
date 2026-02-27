@@ -80,20 +80,31 @@ def carica_foto_imgbb(foto_bytes):
     return None
 
 # --- 3. IMPOSTAZIONI PAGINA E GRAFICA ---
-st.set_page_config(page_title="Compilazione Note Spese", page_icon="💶")
+# URL di un'icona a forma di scontrino
+LOGO_URL = "https://cdn-icons-png.flaticon.com/512/3100/3100067.png"
+
+st.set_page_config(
+    page_title="Note Spese", 
+    page_icon=LOGO_URL,      
+    layout="centered"
+)
 
 st.markdown(
-    """
+    f"""
     <style>
     div[data-testid="stTextInput"] div[data-baseweb="input"] > div,
-    div[data-testid="stNumberInput"] div[data-baseweb="input"] > div {
+    div[data-testid="stNumberInput"] div[data-baseweb="input"] > div {{
         background-color: #e8f5e9 !important; 
-    }
+    }}
     div[data-testid="stTextInput"] input,
-    div[data-testid="stNumberInput"] input {
+    div[data-testid="stNumberInput"] input {{
         color: black !important; -webkit-text-fill-color: black !important; font-weight: bold;
-    }
+    }}
     </style>
+    <head>
+        <meta name="theme-color" content="#e8f5e9">
+        <link rel="apple-touch-icon" href="{LOGO_URL}">
+    </head>
     """,
     unsafe_allow_html=True
 )
@@ -257,6 +268,6 @@ if len(st.session_state.spese_settimana) > 0:
                 if successo:
                     st.session_state.spese_settimana = []
                     st.rerun()
-            
+        
     except FileNotFoundError:
         st.error("❌ ERRORE: Non trovo il file 'modello_spese.xlsx' su GitHub.")
