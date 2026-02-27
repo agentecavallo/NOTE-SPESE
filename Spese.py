@@ -10,12 +10,13 @@ import base64
 from fpdf import FPDF
 from PIL import Image, ImageOps
 
-# --- 1. L'ARTIGLIERIA PESANTE CONTRO LA TASTIERA ---
+# --- 1. JAVASCRIPT: TASTIERA DATA E TASTO INVIO ---
 components.html(
     """
     <script>
     const parentDoc = window.parent.document;
     
+    // A. Observer per abbassare la tastiera sulla Data
     const observer = new MutationObserver(() => {
         const inputs = parentDoc.querySelectorAll('div[data-testid="stDateInput"] input');
         inputs.forEach(input => {
@@ -24,8 +25,30 @@ components.html(
             }
         });
     });
-    
     observer.observe(parentDoc.body, { childList: true, subtree: true });
+
+    // B. Blocca il tasto Invio (Enter) e spostati alla casella successiva
+    if (!parentDoc.getElementById('enter-blocker')) {
+        const marker = parentDoc.createElement('div');
+        marker.id = 'enter-blocker';
+        parentDoc.body.appendChild(marker);
+
+        parentDoc.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                const active = parentDoc.activeElement;
+                if (active && active.tagName === 'INPUT' && active.type !== 'file') {
+                    e.preventDefault(); // Ferma il salvataggio automatico!
+                    
+                    // Simula il tasto TAB (passa al campo dopo)
+                    const focusable = Array.from(parentDoc.querySelectorAll('input:not([disabled])'));
+                    const index = focusable.indexOf(active);
+                    if (index > -1 && index < focusable.length - 1) {
+                        focusable[index + 1].focus();
+                    }
+                }
+            }
+        }, true); // "true" intercetta l'evento prima che lo faccia Streamlit
+    }
     </script>
     """,
     height=0, width=0
@@ -90,7 +113,7 @@ def carica_foto_imgbb(foto_bytes):
     
     payload = {
         "key": IMGBB_KEY,
-        "expiration": 2592000, # 30 giorni
+        "expiration": 2592000, 
         "image": foto_b64
     }
     
@@ -104,19 +127,33 @@ def carica_foto_imgbb(foto_bytes):
         st.error(f"⚠️ Errore di connessione durante l'invio della foto: {e}")
     return None
 
-# --- 4. IMPOSTAZIONI PAGINA E GRAFICA ---
+# --- 4. IMPOSTAZIONI PAGINA E GRAFICA (CON BOTTONI VERDI) ---
 st.set_page_config(page_title="Compilazione Note Spese", page_icon="💶")
 
 st.markdown(
     """
     <style>
+    /* Colore sfondo input testuali */
     div[data-testid="stTextInput"] div[data-baseweb="input"] > div,
     div[data-testid="stNumberInput"] div[data-baseweb="input"] > div {
         background-color: #e8f5e9 !important; 
     }
+    /* Colore testo input */
     div[data-testid="stTextInput"] input,
     div[data-testid="stNumberInput"] input {
         color: black !important; -webkit-text-fill-color: black !important; font-weight: bold;
+    }
+    
+    /* 🟢 NOVITÀ: Stile speciale per i pulsanti di Download (PDF ed Excel) */
+    div[data-testid="stDownloadButton"] button {
+        background-color: #28a745 !important; /* Verde brillante */
+        color: white !important;
+        border: none !important;
+        font-weight: bold;
+    }
+    div[data-testid="stDownloadButton"] button:hover {
+        background-color: #218838 !important; /* Verde più scuro quando ci passi sopra */
+        color: white !important;
     }
     </style>
     """,
@@ -246,7 +283,6 @@ if len(st.session_state.spese_settimana) > 0:
 
                 pdf_bytes = pdf.output()
                 
-                # 🟢 NUOVO: Calcoliamo il nome file del PDF in base alla settimana!
                 prima_data = st.session_state.spese_settimana[0]["data"]
                 numero_settimana = prima_data.isocalendar()[1]
                 nome_file_pdf = f"Scontrini_Settimana_{numero_settimana}.pdf"
