@@ -13,19 +13,6 @@ from PIL import Image, ImageOps
 # --- 1. IMPOSTAZIONI PAGINA E CSS MODERNO (ADATTIVO DARK/LIGHT MODE) ---
 st.set_page_config(page_title="Gestione Note Spese", page_icon="💶", layout="wide")
 
-# --- AGGIUNTA LOGO IN ALTO A DESTRA ---
-col_vuota, col_logo = st.columns([10, 1]) # Crea una colonna larga e una piccola a destra
-with col_logo:
-    try:
-        st.image("michelone.jpg", width=55)
-    except:
-        st.write("Logo non trovato") # Messaggio di sicurezza se il file manca
-
-st.markdown(
-    """
-    <style>
-    ... (tutto il resto del tuo CSS originale rimane invariato) ...
-
 st.markdown(
     """
     <style>
