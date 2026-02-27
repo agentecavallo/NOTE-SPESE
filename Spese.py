@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components # 🟢 NUOVO: Serve per abbassare la tastiera del telefono
 import openpyxl
 from openpyxl.styles import Font, Border, Side
 from io import BytesIO
@@ -7,9 +8,24 @@ import requests
 import json
 import base64
 from fpdf import FPDF
-from PIL import Image, ImageOps  # 🟢 NUOVO: Aggiunto ImageOps per raddrizzare le foto!
+from PIL import Image, ImageOps
 
-# --- 1. CONFIGURAZIONE CLOUD E CHIAVI ---
+# --- 1. TRUCCHETTO JAVASCRIPT PER BLOCCARE LA TASTIERA SULLA DATA ---
+# Questo codice invisibile dice al telefono di non aprire la tastiera quando tocchi la data
+components.html(
+    """
+    <script>
+    const inputs = window.parent.document.querySelectorAll('div[data-testid="stDateInput"] input');
+    inputs.forEach(input => {
+        input.setAttribute('readonly', 'readonly');
+        input.setAttribute('inputmode', 'none');
+    });
+    </script>
+    """,
+    height=0, width=0
+)
+
+# --- 2. CONFIGURAZIONE CLOUD E CHIAVI ---
 try:
     BIN_ID = st.secrets["JSONBIN_ID"]
     API_KEY = st.secrets["JSONBIN_KEY"]
@@ -24,7 +40,7 @@ HEADERS = {
     "Content-Type": "application/json"
 }
 
-# --- 2. FUNZIONI DI MEMORIA E FOTO ---
+# --- 3. FUNZIONI DI MEMORIA E FOTO ---
 def salva_spese(lista_spese):
     dati_da_salvare = []
     for spesa in lista_spese:
@@ -77,12 +93,12 @@ def carica_foto_imgbb(foto_bytes):
         if res.status_code == 200:
             return res.json()["data"]["url"]
         else:
-            st.error(f"⚠️ Errore da ImgBB: {res.text}")
+            st.error(f"⚠️ ImgBB ha rifiutato la foto: {res.text}")
     except Exception as e:
-        st.error(f"⚠️ Errore di caricamento foto: {e}")
+        st.error(f"⚠️ Errore di connessione durante l'invio della foto: {e}")
     return None
 
-# --- 3. IMPOSTAZIONI PAGINA E GRAFICA ---
+# --- 4. IMPOSTAZIONI PAGINA E GRAFICA ---
 st.set_page_config(page_title="Compilazione Note Spese", page_icon="💶")
 
 st.markdown(
@@ -106,7 +122,7 @@ st.title("Gestione Nota Spese 📝")
 if "spese_settimana" not in st.session_state:
     st.session_state.spese_settimana = carica_spese()
 
-# --- 4. INSERIMENTO DATI ---
+# --- 5. INSERIMENTO DATI ---
 with st.form("form_spese", clear_on_submit=True):
     data_input = st.date_input("Data della spesa", datetime.date.today())
     motivazione = st.text_input("Motivazione (es. Pranzo Cliente Rossi)")
@@ -130,25 +146,30 @@ if submit:
     else:
         foto_url = None
         if foto_scontrino is not None:
-            with st.spinner("⏳ Compressione e raddrizzamento foto in corso..."):
-                immagine_originale = Image.open(foto_scontrino)
-                
-                # 🟢 MAGIA DELLA ROTAZIONE: raddrizza la foto leggendo l'etichetta del telefono!
-                immagine_originale = ImageOps.exif_transpose(immagine_originale)
-                
-                if immagine_originale.mode in ("RGBA", "P"):
-                    immagine_originale = immagine_originale.convert("RGB")
-                
-                immagine_originale.thumbnail((1200, 1200))
-                
-                buffer = BytesIO()
-                immagine_originale.save(buffer, format="JPEG", quality=75) 
-                foto_compressa_bytes = buffer.getvalue()
-                
-                foto_url = carica_foto_imgbb(foto_compressa_bytes)
-                
-                if foto_url is None:
-                    st.error("❌ Non sono riuscito a salvare la foto. La spesa NON è stata aggiunta.")
+            with st.spinner("⏳ Elaborazione foto in corso..."):
+                try:
+                    # 🟢 INSERITO BLOCCO DI SICUREZZA PER GLI ERRORI FOTO
+                    immagine_originale = Image.open(foto_scontrino)
+                    immagine_originale = ImageOps.exif_transpose(immagine_originale)
+                    
+                    if immagine_originale.mode in ("RGBA", "P"):
+                        immagine_originale = immagine_originale.convert("RGB")
+                    
+                    immagine_originale.thumbnail((1200, 1200))
+                    
+                    buffer = BytesIO()
+                    immagine_originale.save(buffer, format="JPEG", quality=75) 
+                    foto_compressa_bytes = buffer.getvalue()
+                    
+                    foto_url = carica_foto_imgbb(foto_compressa_bytes)
+                    
+                    if foto_url is None:
+                        st.error("❌ Errore durante il caricamento online della foto. Spesa non aggiunta.")
+                        st.stop()
+                        
+                except Exception as error_foto:
+                    # Se il telefono manda un formato strano, ora ce lo dice qui!
+                    st.error(f"❌ Impossibile elaborare questa foto dal tuo telefono. Dettaglio errore: {error_foto}")
                     st.stop()
         
         nuova_spesa = {
@@ -166,7 +187,7 @@ if submit:
         if successo:
             st.rerun()
 
-# --- 5. MOSTRA SPESE E PULSANTI ---
+# --- 6. MOSTRA SPESE E PULSANTI ---
 if len(st.session_state.spese_settimana) > 0:
     st.markdown("---")
     st.markdown("### 🛒 Spese inserite finora:")
@@ -214,7 +235,6 @@ if len(st.session_state.spese_settimana) > 0:
                         try:
                             req = requests.get(spesa_corrente["foto_url"], timeout=10)
                             img_bytes = BytesIO(req.content)
-                            # Ora la foto sarà dritta come un fuso!
                             pdf.image(img_bytes, x=x_posizione, y=25, w=larghezza_foto)
                         except Exception as e:
                             pdf.set_xy(x_posizione, 50)
