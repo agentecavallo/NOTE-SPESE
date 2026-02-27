@@ -1,5 +1,5 @@
 import streamlit as st
-import streamlit.components.v1 as components # 🟢 NUOVO: Serve per abbassare la tastiera del telefono
+import streamlit.components.v1 as components 
 import openpyxl
 from openpyxl.styles import Font, Border, Side
 from io import BytesIO
@@ -10,16 +10,23 @@ import base64
 from fpdf import FPDF
 from PIL import Image, ImageOps
 
-# --- 1. TRUCCHETTO JAVASCRIPT PER BLOCCARE LA TASTIERA SULLA DATA ---
-# Questo codice invisibile dice al telefono di non aprire la tastiera quando tocchi la data
+# --- 1. L'ARTIGLIERIA PESANTE CONTRO LA TASTIERA ---
+# Usiamo un MutationObserver per tenere la tastiera abbassata SEMPRE
 components.html(
     """
     <script>
-    const inputs = window.parent.document.querySelectorAll('div[data-testid="stDateInput"] input');
-    inputs.forEach(input => {
-        input.setAttribute('readonly', 'readonly');
-        input.setAttribute('inputmode', 'none');
+    const parentDoc = window.parent.document;
+    
+    const observer = new MutationObserver(() => {
+        const inputs = parentDoc.querySelectorAll('div[data-testid="stDateInput"] input');
+        inputs.forEach(input => {
+            if (input.getAttribute('inputmode') !== 'none') {
+                input.setAttribute('inputmode', 'none');
+            }
+        });
     });
+    
+    observer.observe(parentDoc.body, { childList: true, subtree: true });
     </script>
     """,
     height=0, width=0
@@ -136,7 +143,8 @@ with st.form("form_spese", clear_on_submit=True):
     importo = st.number_input("Importo in Euro (€)", min_value=0.0, step=0.01, format="%.2f", value=None)
     
     st.markdown("---")
-    foto_scontrino = st.file_uploader("📸 Scatta o allega foto scontrino", type=["png", "jpg", "jpeg"])
+    # Ho aggiunto 'heic' ai tipi per forzare il telefono (specialmente iOS) a riconoscere meglio la fotocamera
+    foto_scontrino = st.file_uploader("📸 Scatta o allega foto scontrino", type=["png", "jpg", "jpeg", "heic"])
     
     submit = st.form_submit_button("➕ Aggiungi alla lista della settimana")
 
@@ -148,7 +156,6 @@ if submit:
         if foto_scontrino is not None:
             with st.spinner("⏳ Elaborazione foto in corso..."):
                 try:
-                    # 🟢 INSERITO BLOCCO DI SICUREZZA PER GLI ERRORI FOTO
                     immagine_originale = Image.open(foto_scontrino)
                     immagine_originale = ImageOps.exif_transpose(immagine_originale)
                     
@@ -168,7 +175,6 @@ if submit:
                         st.stop()
                         
                 except Exception as error_foto:
-                    # Se il telefono manda un formato strano, ora ce lo dice qui!
                     st.error(f"❌ Impossibile elaborare questa foto dal tuo telefono. Dettaglio errore: {error_foto}")
                     st.stop()
         
