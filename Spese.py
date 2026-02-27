@@ -10,20 +10,17 @@ import base64
 from fpdf import FPDF
 from PIL import Image, ImageOps
 
-# --- 1. IMPOSTAZIONI PAGINA E CSS MODERNO ---
+# --- 1. IMPOSTAZIONI PAGINA E CSS MODERNO (ADATTIVO DARK/LIGHT MODE) ---
 st.set_page_config(page_title="Gestione Note Spese", page_icon="💶", layout="wide")
 
 st.markdown(
     """
     <style>
-    /* Sfondo e bordi input testuali */
+    /* Bordi input testuali per abbellirli senza rompere il Dark Mode */
     div[data-testid="stTextInput"] input,
     div[data-testid="stNumberInput"] input {
-        background-color: #f8fcf8 !important; 
         border-radius: 8px !important;
-        border: 1px solid #c8e6c9 !important;
-        color: #1b5e20 !important; 
-        -webkit-text-fill-color: #1b5e20 !important; 
+        border: 1px solid #28a745 !important;
         font-weight: 600;
     }
     
@@ -71,12 +68,12 @@ st.markdown(
         background-color: #c82333 !important;
     }
     
-    /* Box delle spese per dare un effetto "scheda" pulito */
+    /* Box delle spese: Sfondo semi-trasparente per supportare sia Dark che Light Mode */
     div[data-testid="stHorizontalBlock"] {
-        background-color: #ffffff;
+        background-color: rgba(128, 128, 128, 0.1); /* Grigio trasparente invece del bianco esplosivo */
         padding: 10px;
         border-radius: 8px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        border: 1px solid rgba(128, 128, 128, 0.2);
         margin-bottom: 5px;
         align-items: center;
     }
@@ -200,17 +197,25 @@ st.title("Gestione Nota Spese 📝")
 with st.sidebar:
     st.header("➕ Nuova Spesa")
     with st.form("form_spese", clear_on_submit=True):
+        # 1. Data
         data_input = st.date_input("Data della spesa", datetime.date.today())
+        
+        # 2. Motivazione
         motivazione = st.text_input("Motivazione (es. Pranzo Cliente Rossi)")
         
+        # 3. Importo (spostato qui come richiesto)
+        importo = st.number_input("Importo in Euro (€)", min_value=0.0, step=0.01, format="%.2f", value=None)
+        
+        # 4. Tipo Spesa (casella combinata spostata sotto)
         tipo_spesa = st.selectbox(
-            "Seleziona la colonna",
+            "Seleziona la colonna di destinazione",
             ["Fatture - Carta di Credito Nominale (Colonna H)", "Scontrini - Carta di Credito Nominale (Colonna G)", 
              "Scontrini - Contanti (Colonna C)", "Fatture - Contanti (Colonna D)", "Fatture - Bonifico (Colonna I)"]
         )
         
-        importo = st.number_input("Importo in Euro (€)", min_value=0.0, step=0.01, format="%.2f", value=None)
+        # 5. Foto
         foto_scontrino = st.file_uploader("📸 Scatta o allega scontrino", type=["png", "jpg", "jpeg", "heic"])
+        
         submit = st.form_submit_button("Aggiungi alla lista")
 
     if submit:
