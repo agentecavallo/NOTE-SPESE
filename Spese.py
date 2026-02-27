@@ -82,12 +82,13 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# --- 2. JAVASCRIPT: TASTIERA DATA E TASTO INVIO ---
+# --- 2. JAVASCRIPT: POTENZIATO PER BLOCCARE INVIO E USARE TAB ---
 components.html(
     """
     <script>
     const parentDoc = window.parent.document;
     
+    // A. Observer per abbassare la tastiera sulla Data
     const observer = new MutationObserver(() => {
         const inputs = parentDoc.querySelectorAll('div[data-testid="stDateInput"] input');
         inputs.forEach(input => {
@@ -98,25 +99,47 @@ components.html(
     });
     observer.observe(parentDoc.body, { childList: true, subtree: true });
 
-    if (!parentDoc.getElementById('enter-blocker')) {
+    // B. Blocca rigorosamente l'Invio nei form Streamlit e simula il TAB
+    if (!parentDoc.getElementById('enter-blocker-v2')) {
         const marker = parentDoc.createElement('div');
-        marker.id = 'enter-blocker';
+        marker.id = 'enter-blocker-v2';
         parentDoc.body.appendChild(marker);
 
         parentDoc.addEventListener('keydown', function(e) {
             if (e.key === 'Enter') {
                 const active = parentDoc.activeElement;
-                if (active && active.tagName === 'INPUT' && active.type !== 'file') {
-                    e.preventDefault(); 
+                
+                // Se premiamo invio dentro un input testo o numero
+                if (active && active.tagName === 'INPUT' && active.type !== 'file' && active.type !== 'submit') {
                     
-                    const focusable = Array.from(parentDoc.querySelectorAll('input:not([disabled])'));
-                    const index = focusable.indexOf(active);
+                    // STOP ASSOLUTO ALL'INVIO DEL FORM!
+                    e.preventDefault(); 
+                    e.stopPropagation();
+                    e.stopImmediatePropagation();
+                    
+                    // Trova tutti gli elementi interattivi (Input testuali/numerici e le tendine Selectbox)
+                    const focusable = Array.from(parentDoc.querySelectorAll('input:not([disabled]):not([type="hidden"]), div[data-baseweb="select"]'));
+                    
+                    let index = focusable.indexOf(active);
+                    if (index === -1) {
+                        index = focusable.findIndex(el => el.contains(active));
+                    }
+
+                    // Se troviamo l'elemento corrente e c'è uno successivo
                     if (index > -1 && index < focusable.length - 1) {
-                        focusable[index + 1].focus();
+                        const nextEl = focusable[index + 1];
+                        
+                        // Spostiamo il focus
+                        if (nextEl.tagName === 'INPUT') {
+                            nextEl.focus();
+                        } else {
+                            // Se è una tendina (Selectbox), la "clicchiamo" per aprirla e darle il focus
+                            nextEl.click();
+                        }
                     }
                 }
             }
-        }, true);
+        }, true); // 'true' = intercettiamo il tasto prim'ancora che ci arrivi Streamlit
     }
     </script>
     """,
