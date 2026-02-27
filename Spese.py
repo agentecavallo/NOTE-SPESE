@@ -6,7 +6,6 @@ import datetime
 import requests
 import json
 from fpdf import FPDF
-import base64
 
 # --- 1. CONFIGURAZIONE CLOUD E CHIAVI ---
 try:
@@ -81,41 +80,24 @@ def carica_foto_imgbb(foto_bytes):
     return None
 
 # --- 3. IMPOSTAZIONI PAGINA E GRAFICA ---
-# Funzione per convertire l'immagine locale in codice
-def get_base64_of_bin_file(bin_file):
-    try:
-        with open(bin_file, 'rb') as f:
-            data = f.read()
-        return base64.b64encode(data).decode()
-    except FileNotFoundError:
-        return "" # Previene crash se dimentichi di caricare il file su GitHub
-
-img_base64 = get_base64_of_bin_file("favicon.png")
-
 st.set_page_config(
     page_title="Note Spese", 
-    page_icon="favicon.png",      
+    page_icon="🧾",      
     layout="centered"
 )
 
-# Iniezione forzata dell'icona per i dispositivi mobili
 st.markdown(
-    f"""
+    """
     <style>
     div[data-testid="stTextInput"] div[data-baseweb="input"] > div,
-    div[data-testid="stNumberInput"] div[data-baseweb="input"] > div {{
+    div[data-testid="stNumberInput"] div[data-baseweb="input"] > div {
         background-color: #e8f5e9 !important; 
-    }}
+    }
     div[data-testid="stTextInput"] input,
-    div[data-testid="stNumberInput"] input {{
+    div[data-testid="stNumberInput"] input {
         color: black !important; -webkit-text-fill-color: black !important; font-weight: bold;
-    }}
+    }
     </style>
-    <head>
-        <meta name="theme-color" content="#e8f5e9">
-        <link rel="icon" type="image/png" href="data:image/png;base64,{img_base64}">
-        <link rel="apple-touch-icon" href="data:image/png;base64,{img_base64}">
-    </head>
     """,
     unsafe_allow_html=True
 )
@@ -221,10 +203,6 @@ if len(st.session_state.spese_settimana) > 0:
                             pdf.cell(w=larghezza_foto, h=10, text="Errore caricamento foto", align="C")
 
                 pdf_bytes = pdf.output()
-                
-                # Attenzione: inserire un download_button dentro un bottone normale 
-                # a volte richiede un doppio click su Streamlit. Se ti dà problemi, 
-                # in futuro possiamo semplificare questa parte!
                 st.download_button(label="⬇️ Scarica il file PDF", data=bytes(pdf_bytes), file_name="scontrini_settimana.pdf", mime="application/pdf")
         st.markdown("---")
 
