@@ -70,7 +70,7 @@ st.markdown(
     
     /* Box delle spese: Sfondo semi-trasparente per supportare sia Dark che Light Mode */
     div[data-testid="stHorizontalBlock"] {
-        background-color: rgba(128, 128, 128, 0.1); /* Grigio trasparente invece del bianco esplosivo */
+        background-color: rgba(128, 128, 128, 0.1); 
         padding: 10px;
         border-radius: 8px;
         border: 1px solid rgba(128, 128, 128, 0.2);
@@ -88,7 +88,6 @@ components.html(
     <script>
     const parentDoc = window.parent.document;
     
-    // A. Observer per abbassare la tastiera sulla Data
     const observer = new MutationObserver(() => {
         const inputs = parentDoc.querySelectorAll('div[data-testid="stDateInput"] input');
         inputs.forEach(input => {
@@ -99,7 +98,6 @@ components.html(
     });
     observer.observe(parentDoc.body, { childList: true, subtree: true });
 
-    // B. Blocca il tasto Invio (Enter) e spostati alla casella successiva
     if (!parentDoc.getElementById('enter-blocker')) {
         const marker = parentDoc.createElement('div');
         marker.id = 'enter-blocker';
@@ -109,9 +107,8 @@ components.html(
             if (e.key === 'Enter') {
                 const active = parentDoc.activeElement;
                 if (active && active.tagName === 'INPUT' && active.type !== 'file') {
-                    e.preventDefault(); // Ferma il salvataggio automatico!
+                    e.preventDefault(); 
                     
-                    // Simula il tasto TAB (passa al campo dopo)
                     const focusable = Array.from(parentDoc.querySelectorAll('input:not([disabled])'));
                     const index = focusable.indexOf(active);
                     if (index > -1 && index < focusable.length - 1) {
@@ -193,6 +190,31 @@ if "spese_settimana" not in st.session_state:
 
 st.title("Gestione Nota Spese 📝")
 
+# 🔴🔴🔴 LOGICA DEL PROMEMORIA DEL LUNEDÌ 🔴🔴🔴
+oggi = datetime.date.today()
+if len(st.session_state.spese_settimana) > 0:
+    prima_data = st.session_state.spese_settimana[0]["data"]
+    
+    # Calcoliamo a che settimana appartengono oggi e le spese in memoria
+    anno_oggi, sett_oggi, _ = oggi.isocalendar()
+    anno_spesa, sett_spesa, _ = prima_data.isocalendar()
+    
+    # Verifichiamo se le spese sono "vecchie" (settimana o anno precedente)
+    is_settimana_precedente = (anno_oggi > anno_spesa) or (anno_oggi == anno_spesa and sett_oggi > sett_spesa)
+    
+    # Se oggi è Lunedì (weekday 0) e le spese sono della settimana scorsa
+    if oggi.weekday() == 0 and is_settimana_precedente:
+        st.error(
+            "**🚨 PROMEMORIA IMPORTANTE DI LUNEDÌ!**\n\n"
+            "Hai ancora in memoria le spese della settimana scorsa. Ricordati di:\n"
+            "1. **Scaricare** il PDF e l'Excel.\n"
+            "2. **Inviare** la documentazione.\n"
+            "3. **Svuotare la lista** (usando il tasto rosso in fondo alla pagina) prima di inserire le spese di questa nuova settimana!",
+            icon="🚨"
+        )
+        st.markdown("---")
+
+
 # --- SIDEBAR: Area di inserimento ---
 with st.sidebar:
     st.header("➕ Nuova Spesa")
@@ -203,10 +225,10 @@ with st.sidebar:
         # 2. Motivazione
         motivazione = st.text_input("Motivazione (es. Pranzo Cliente Rossi)")
         
-        # 3. Importo (spostato qui come richiesto)
+        # 3. Importo
         importo = st.number_input("Importo in Euro (€)", min_value=0.0, step=0.01, format="%.2f", value=None)
         
-        # 4. Tipo Spesa (casella combinata spostata sotto)
+        # 4. Tipo Spesa
         tipo_spesa = st.selectbox(
             "Seleziona la colonna di destinazione",
             ["Fatture - Carta di Credito Nominale (Colonna H)", "Scontrini - Carta di Credito Nominale (Colonna G)", 
@@ -255,7 +277,6 @@ with st.sidebar:
 # --- MAIN AREA: Riepilogo e Download ---
 if len(st.session_state.spese_settimana) > 0:
     
-    # Metrica in evidenza per il totale
     totale_settimana = sum(spesa["importo"] for spesa in st.session_state.spese_settimana)
     st.metric(label="💶 Totale Spese Inserite", value=f"{totale_settimana:.2f} €")
     st.markdown("---")
@@ -283,7 +304,6 @@ if len(st.session_state.spese_settimana) > 0:
     st.markdown("---")
     st.subheader("📥 Genera Documenti")
     
-    # Colonne per i pulsanti di download per affiancarli
     col_dl1, col_dl2 = st.columns(2)
     
     # -- 1. PDF --
