@@ -5,6 +5,7 @@ from io import BytesIO
 import datetime
 import requests
 import json
+import base64  # 🟢 NUOVO: Serve per "impacchettare" la foto in alta qualità
 from fpdf import FPDF
 
 # --- 1. CONFIGURAZIONE CLOUD E CHIAVI ---
@@ -33,19 +34,19 @@ def salva_spese(lista_spese):
     payload = {"spese": dati_da_salvare}
     
     try:
-        res = requests.put(URL_JSONBIN, json=payload, headers=HEADERS, timeout=5)
+        res = requests.put(URL_JSONBIN, json=payload, headers=HEADERS, timeout=10)
         if res.status_code == 200:
             return True
         else:
             st.error(f"⚠️ Errore dal server JSONBin: {res.text}")
             return False
     except Exception as e:
-        st.error(f"⚠️ Errore di connessione: {e}")
+        st.error(f"⚠️ Errore di connessione a JSONBin: {e}")
         return False
 
 def carica_spese():
     try:
-        risposta = requests.get(URL_JSONBIN, headers=HEADERS, timeout=5)
+        risposta = requests.get(URL_JSONBIN, headers=HEADERS, timeout=10)
         if risposta.status_code == 200:
             record = risposta.json().get("record", {})
             if isinstance(record, list):
@@ -60,22 +61,29 @@ def carica_spese():
         pass
     return []
 
+# 🟢 NUOVO MOTORE FOTO: Più robusto e con tempo di attesa più lungo
 def carica_foto_imgbb(foto_bytes):
     url = "https://api.imgbb.com/1/upload"
     
-    # Autodistruzione: 2592000 secondi = esattamente 30 giorni
+    # Trasformiamo la foto in un formato di testo (Base64) che ImgBB digerisce sempre al 100%
+    foto_b64 = base64.b64encode(foto_bytes).decode('utf-8')
+    
     payload = {
         "key": IMGBB_KEY,
-        "expiration": 2592000  
+        "expiration": 2592000, # 30 giorni
+        "image": foto_b64
     }
     
-    files = {"image": foto_bytes}
     try:
-        res = requests.post(url, data=payload, files=files, timeout=15) 
+        # 🟢 Alzato il timeout a 60 secondi: le foto HD pesano molto!
+        res = requests.post(url, data=payload, timeout=60) 
         if res.status_code == 200:
             return res.json()["data"]["url"]
-    except Exception:
-        pass
+        else:
+            # Se ImgBB rifiuta la foto, ora ce lo dice chiaro e tondo!
+            st.error(f"⚠️ Errore da ImgBB: {res.text}")
+    except Exception as e:
+        st.error(f"⚠️ Errore di caricamento foto (connessione lenta?): {e}")
     return None
 
 # --- 3. IMPOSTAZIONI PAGINA E GRAFICA ---
@@ -117,8 +125,6 @@ with st.form("form_spese", clear_on_submit=True):
     
     st.markdown("---")
     
-    # 🟢 IL TRUCCO PER LA MASSIMA QUALITÀ
-    # Usiamo file_uploader invece di camera_input
     foto_scontrino = st.file_uploader("📸 Scatta o allega foto scontrino (Alta Qualità)", type=["png", "jpg", "jpeg"])
     
     submit = st.form_submit_button("➕ Aggiungi alla lista della settimana")
@@ -129,8 +135,13 @@ if submit:
     else:
         foto_url = None
         if foto_scontrino is not None:
-            with st.spinner("⏳ Caricamento foto in alta qualità in corso..."):
+            with st.spinner("⏳ Caricamento foto in alta qualità in corso (potrebbe volerci mezzo minuto)..."):
                 foto_url = carica_foto_imgbb(foto_scontrino.getvalue())
+                
+                # Controllo di sicurezza: se la foto fallisce, fermiamo tutto e avvisiamo
+                if foto_url is None:
+                    st.error("❌ Non sono riuscito a salvare la foto. La spesa NON è stata aggiunta. Riprova con una connessione migliore o una foto più leggera.")
+                    st.stop()
         
         nuova_spesa = {
             "data": data_input,
@@ -141,7 +152,7 @@ if submit:
         }
         st.session_state.spese_settimana.append(nuova_spesa)
         
-        with st.spinner("💾 Salvataggio nel cloud..."):
+        with st.spinner("💾 Salvataggio della spesa nel cloud..."):
             successo = salva_spese(st.session_state.spese_settimana)
             
         if successo:
@@ -176,7 +187,7 @@ if len(st.session_state.spese_settimana) > 0:
     
     if len(spese_con_foto) > 0:
         if st.button("📄 Crea PDF degli Scontrini"):
-            with st.spinner("⏳ Preparazione del PDF in corso..."):
+            with st.spinner("⏳ Preparazione del PDF in corso (potrebbe volerci un po' per scaricare le foto in HD)..."):
                 pdf = FPDF(orientation="L", unit="mm", format="A4") 
                 for i in range(0, len(spese_con_foto), 3):
                     pdf.add_page()
@@ -193,10 +204,11 @@ if len(st.session_state.spese_settimana) > 0:
                         pdf.cell(w=larghezza_foto, h=10, text=spesa_corrente['motivazione'][:30], align="C")
                         
                         try:
-                            req = requests.get(spesa_corrente["foto_url"], timeout=10)
+                            # 🟢 Alzato il timeout anche qui, scaricare foto HD per il PDF richiede tempo!
+                            req = requests.get(spesa_corrente["foto_url"], timeout=20)
                             img_bytes = BytesIO(req.content)
                             pdf.image(img_bytes, x=x_posizione, y=25, w=larghezza_foto)
-                        except Exception:
+                        except Exception as e:
                             pdf.set_xy(x_posizione, 50)
                             pdf.cell(w=larghezza_foto, h=10, text="Errore caricamento foto", align="C")
 
