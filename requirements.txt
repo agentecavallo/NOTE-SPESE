@@ -2,3 +2,4 @@ openpyxl
 streamlit
 requests
 fpdf2
+Pillow
