@@ -63,7 +63,7 @@ def carica_spese():
 def carica_foto_imgbb(foto_bytes):
     url = "https://api.imgbb.com/1/upload"
     
-    # 🟢 AGGIUNTA L'AUTODISTRUZIONE: 2592000 secondi = esattamente 30 giorni
+    # Autodistruzione: 2592000 secondi = esattamente 30 giorni
     payload = {
         "key": IMGBB_KEY,
         "expiration": 2592000  
@@ -71,7 +71,6 @@ def carica_foto_imgbb(foto_bytes):
     
     files = {"image": foto_bytes}
     try:
-        # Timeout aumentato a 15 secondi per dare tempo al telefono di inviare la foto
         res = requests.post(url, data=payload, files=files, timeout=15) 
         if res.status_code == 200:
             return res.json()["data"]["url"]
@@ -80,11 +79,7 @@ def carica_foto_imgbb(foto_bytes):
     return None
 
 # --- 3. IMPOSTAZIONI PAGINA E GRAFICA ---
-st.set_page_config(
-    page_title="Note Spese", 
-    page_icon="🧾",      
-    layout="centered"
-)
+st.set_page_config(page_title="Compilazione Note Spese", page_icon="💶")
 
 st.markdown(
     """
@@ -121,7 +116,10 @@ with st.form("form_spese", clear_on_submit=True):
     importo = st.number_input("Importo in Euro (€)", min_value=0.0, step=0.01, format="%.2f", value=None)
     
     st.markdown("---")
-    foto_scontrino = st.camera_input("📸 Scatta foto allo scontrino (Opzionale)")
+    
+    # 🟢 IL TRUCCO PER LA MASSIMA QUALITÀ
+    # Usiamo file_uploader invece di camera_input
+    foto_scontrino = st.file_uploader("📸 Scatta o allega foto scontrino (Alta Qualità)", type=["png", "jpg", "jpeg"])
     
     submit = st.form_submit_button("➕ Aggiungi alla lista della settimana")
 
@@ -131,7 +129,7 @@ if submit:
     else:
         foto_url = None
         if foto_scontrino is not None:
-            with st.spinner("⏳ Caricamento foto in corso..."):
+            with st.spinner("⏳ Caricamento foto in alta qualità in corso..."):
                 foto_url = carica_foto_imgbb(foto_scontrino.getvalue())
         
         nuova_spesa = {
@@ -261,6 +259,6 @@ if len(st.session_state.spese_settimana) > 0:
                 if successo:
                     st.session_state.spese_settimana = []
                     st.rerun()
-        
+            
     except FileNotFoundError:
         st.error("❌ ERRORE: Non trovo il file 'modello_spese.xlsx' su GitHub.")
