@@ -29,99 +29,96 @@ image_html = ""
 if os.path.exists(IMAGE_FILENAME):
     try:
         encoded_image = get_base64_of_bin_file(IMAGE_FILENAME)
-        # HTML/CSS per posizionamento fisso in alto a destra (60px)
-        image_html = f"""
-            <img src="data:image/jpg;base64,{encoded_image}" class="logo-firma">
-        """
+        # NESSUNO SPAZIO INIZIALE per evitare che Markdown lo legga come codice
+        image_html = f'<img src="data:image/jpg;base64,{encoded_image}" class="logo-firma">'
     except Exception as e:
-        # In caso di errore silenzioso, non mostrare nulla o un placeholder
         pass
 
 st.markdown(
     f"""
-    <style>
-    /* Stile per il logo/firma in alto a destra */
-    .logo-firma {{
-        position: fixed;
-        top: 10px;
-        right: 10px;
-        width: 60px; /* Dimensione scelta */
-        height: auto;
-        z-index: 99999; /* Assicura che stia sopra tutto */
-        border-radius: 50%; /* Opzionale: rende l'immagine tonda tipo avatar */
-        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        border: 2px solid white; /* Un piccolo bordo per staccare dal fondo */
-    }}
-    
-    /* Padding per il titolo principale per non sovrapporsi al logo su schermi piccoli */
-    h1 {{
-        padding-right: 80px;
-    }}
+<style>
+/* Stile per il logo/firma in alto a destra */
+.logo-firma {{
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    width: 60px; /* Dimensione scelta */
+    height: auto;
+    z-index: 99999; /* Assicura che stia sopra tutto */
+    border-radius: 50%; /* Rende l'immagine tonda tipo avatar */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    border: 2px solid white; /* Un piccolo bordo per staccare dal fondo */
+}}
 
-    /* Bordi input testuali per abbellirli senza rompere il Dark Mode */
-    div[data-testid="stTextInput"] input,
-    div[data-testid="stNumberInput"] input {{
-        border-radius: 8px !important;
-        border: 1px solid #28a745 !important;
-        font-weight: 600;
-    }}
-    
-    /* Stile pulsante di Invio (Verde) */
-    div[data-testid="stFormSubmitButton"] button {{
-        background-color: #28a745 !important;
-        color: white !important;
-        border-radius: 8px !important;
-        border: none !important;
-        font-weight: bold !important;
-        transition: all 0.3s ease;
-        width: 100%;
-    }}
-    div[data-testid="stFormSubmitButton"] button:hover {{
-        background-color: #218838 !important;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.15) !important;
-        transform: translateY(-2px);
-    }}
+/* Padding per il titolo principale per non sovrapporsi al logo su schermi piccoli */
+h1 {{
+    padding-right: 80px;
+}}
 
-    /* Stile pulsanti di Download (Blu) */
-    div[data-testid="stDownloadButton"] button {{
-        background-color: #007bff !important;
-        color: white !important;
-        border-radius: 8px !important;
-        width: 100%; 
-        font-weight: bold;
-        transition: all 0.3s ease;
-        border: none !important;
-    }}
-    div[data-testid="stDownloadButton"] button:hover {{
-        background-color: #0056b3 !important;
-        box-shadow: 0 4px 8px rgba(0,0,0,0.15) !important;
-        transform: translateY(-2px);
-    }}
+/* Bordi input testuali per abbellirli senza rompere il Dark Mode */
+div[data-testid="stTextInput"] input,
+div[data-testid="stNumberInput"] input {{
+    border-radius: 8px !important;
+    border: 1px solid #28a745 !important;
+    font-weight: 600;
+}}
 
-    /* Stile pulsante Elimina riga e Svuota tutto (Rossi) */
-    button[kind="primary"] {{
-        background-color: #dc3545 !important;
-        color: white !important;
-        border-radius: 8px !important;
-        border: none !important;
-        font-weight: bold;
-    }}
-    button[kind="primary"]:hover {{
-        background-color: #c82333 !important;
-    }}
-    
-    /* Box delle spese: Sfondo semi-trasparente per supportare sia Dark che Light Mode */
-    div[data-testid="stHorizontalBlock"] {{
-        background-color: rgba(128, 128, 128, 0.1); 
-        padding: 10px;
-        border-radius: 8px;
-        border: 1px solid rgba(128, 128, 128, 0.2);
-        margin-bottom: 5px;
-        align-items: center;
-    }}
-    </style>
-    
-    {image_html}
+/* Stile pulsante di Invio (Verde) */
+div[data-testid="stFormSubmitButton"] button {{
+    background-color: #28a745 !important;
+    color: white !important;
+    border-radius: 8px !important;
+    border: none !important;
+    font-weight: bold !important;
+    transition: all 0.3s ease;
+    width: 100%;
+}}
+div[data-testid="stFormSubmitButton"] button:hover {{
+    background-color: #218838 !important;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15) !important;
+    transform: translateY(-2px);
+}}
+
+/* Stile pulsanti di Download (Blu) */
+div[data-testid="stDownloadButton"] button {{
+    background-color: #007bff !important;
+    color: white !important;
+    border-radius: 8px !important;
+    width: 100%; 
+    font-weight: bold;
+    transition: all 0.3s ease;
+    border: none !important;
+}}
+div[data-testid="stDownloadButton"] button:hover {{
+    background-color: #0056b3 !important;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15) !important;
+    transform: translateY(-2px);
+}}
+
+/* Stile pulsante Elimina riga e Svuota tutto (Rossi) */
+button[kind="primary"] {{
+    background-color: #dc3545 !important;
+    color: white !important;
+    border-radius: 8px !important;
+    border: none !important;
+    font-weight: bold;
+}}
+button[kind="primary"]:hover {{
+    background-color: #c82333 !important;
+}}
+
+/* Box delle spese: Sfondo semi-trasparente per supportare sia Dark che Light Mode */
+div[data-testid="stHorizontalBlock"] {{
+    background-color: rgba(128, 128, 128, 0.1); 
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(128, 128, 128, 0.2);
+    margin-bottom: 5px;
+    align-items: center;
+}}
+</style>
+
+{image_html}
     """,
     unsafe_allow_html=True
 )
