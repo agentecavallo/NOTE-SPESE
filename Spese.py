@@ -30,7 +30,6 @@ if os.path.exists(IMAGE_FILENAME):
     try:
         encoded_image = get_base64_of_bin_file(IMAGE_FILENAME)
         # NESSUNO SPAZIO INIZIALE per evitare che Markdown lo legga come codice
-        # La classe CSS è stata cambiata per il nuovo stile rettangolare.
         image_html = f'<img src="data:image/jpg;base64,{encoded_image}" class="logo-firma-rect">'
     except Exception as e:
         # In caso di errore silenzioso, non mostrare nulla o un placeholder
@@ -39,12 +38,12 @@ if os.path.exists(IMAGE_FILENAME):
 st.markdown(
     f"""
     <style>
-    /* Nuovo wrapper Flexbox per il titolo */
+    /* Wrapper Flexbox per il titolo e il logo adiacenti */
     .title-container {{
         display: flex;
-        justify-content: space-between; /* Spinge il titolo a sinistra e il logo a destra */
         align-items: center; /* Allinea verticalmente il testo e l'immagine */
         margin-bottom: 20px;
+        gap: 20px; /* Spazio tra il testo e l'immagine, spostando il logo a sinistra rispetto a prima */
     }}
 
     /* Stile per il titolo stesso all'interno del container */
@@ -52,14 +51,13 @@ st.markdown(
         margin: 0; /* Rimuove i margini di default per un allineamento perfetto */
     }}
 
-    /* Stile per il logo/firma rettangolare a destra del titolo */
+    /* Stile per il logo/firma rettangolare a destra del titolo, più grande */
     .logo-firma-rect {{
-        width: 60px; /* Dimensione scelta */
+        width: 100px; /* Aumentata la dimensione di oltre la metà rispetto a 60px */
         height: auto;
         border-radius: 8px; /* Rende l'immagine rettangolare con angoli arrotondati, tipo avatar */
         box-shadow: 0 2px 4px rgba(0,0,0,0.2);
         border: 2px solid white; /* Un piccolo bordo per staccare dal fondo */
-        margin-left: 20px; /* Spazio tra il testo e l'immagine */
     }}
     
     /* Bordi input testuali per abbellirli senza rompere il Dark Mode */
@@ -257,7 +255,7 @@ if "spese_settimana" not in st.session_state:
 # --- 5. INTERFACCIA UTENTE (UI) -----------
 # ==========================================
 
-# Sostituito st.title con st.markdown personalizzato per inserire il logo
+# Sostituito st.title con st.markdown personalizzato per inserire il logo adiacente al titolo
 st.markdown(
     f"""
     <div class="title-container">
