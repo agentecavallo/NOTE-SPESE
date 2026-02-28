@@ -251,15 +251,15 @@ with st.sidebar:
         # 3. Importo
         importo = st.number_input("Importo in Euro (€)", min_value=0.0, step=0.01, format="%.2f", value=None)
         
-        # 4. Tipo Spesa
+        # 4. Foto (Spostato prima della Selectbox)
+        foto_scontrino = st.file_uploader("📸 Scatta o allega scontrino", type=["png", "jpg", "jpeg", "heic"])
+
+        # 5. Tipo Spesa (Etichetta aggiornata e spostato dopo la foto)
         tipo_spesa = st.selectbox(
-            "Seleziona la colonna di destinazione",
+            "Modalità spesa",
             ["Fatture - Carta di Credito Nominale (Colonna H)", "Scontrini - Carta di Credito Nominale (Colonna G)", 
              "Scontrini - Contanti (Colonna C)", "Fatture - Contanti (Colonna D)", "Fatture - Bonifico (Colonna I)"]
         )
-        
-        # 5. Foto
-        foto_scontrino = st.file_uploader("📸 Scatta o allega scontrino", type=["png", "jpg", "jpeg", "heic"])
         
         submit = st.form_submit_button("Aggiungi alla lista")
 
@@ -409,12 +409,15 @@ if len(st.session_state.spese_settimana) > 0:
     st.markdown("---")
     
     # -- 3. AZZERA TUTTO --
-    with st.expander("⚠️ Opzioni Pericolose"):
-        st.warning("Attenzione: Questa azione eliminerà tutte le spese correnti dal database.")
-        if st.button("🗑️ Svuota la lista e inizia una nuova settimana", type="primary"):
-            with st.spinner("⏳ Svuotamento..."):
-                if salva_spese([]):
-                    st.session_state.spese_settimana = []
-                    st.rerun()
+    st.subheader("🗑️ Azzera tutto")
+    # Casella di conferma per evitare click accidentali
+    conferma_eliminazione = st.checkbox("⚠️ Confermo di voler eliminare definitivamente tutte le spese correnti dal database.")
+    
+    # Il pulsante di eliminazione è disabilitato se non si spunta la casella
+    if st.button("🗑️ Svuota la lista e inizia una nuova settimana", type="primary", disabled=not conferma_eliminazione):
+        with st.spinner("⏳ Svuotamento..."):
+            if salva_spese([]):
+                st.session_state.spese_settimana = []
+                st.rerun()
 else:
     st.info("👈 Usa il menu a sinistra per inserire la tua prima spesa della settimana!")
