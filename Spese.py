@@ -299,7 +299,7 @@ with st.sidebar:
         data_input = st.date_input("Data della spesa", datetime.date.today())
         
         # 2. Motivazione
-        motivazione = st.text_input("Motivazione (es. Pranzo Cliente Rossi)")
+        motivazione = st.text_input("Giustificativo")
         
         # 3. Importo
         importo = st.number_input("Importo in Euro (€)", min_value=0.0, step=0.01, format="%.2f", value=None)
