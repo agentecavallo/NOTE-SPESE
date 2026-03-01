@@ -310,8 +310,8 @@ with st.sidebar:
         # 5. Tipo Spesa (Etichetta aggiornata e spostato dopo la foto)
         tipo_spesa = st.selectbox(
             "Modalità spesa",
-            ["Fattura - Carta di Credito (colonna H)", "Scontrino - Carta di Credito (colonna G)", 
-             "Scontrino - Contanti (colonna C)", "Fattura - Contanti (colonna D)", "Fattura - Bonifico (colonna I)"]
+            ["Fattura - Carta di Credito (Colonna H)", "Scontrino - Carta di Credito (Colonna G)", 
+             "Scontrino - Contanti (Colonna C)", "Fattura - Contanti (Colonna D)", "Fattura - Bonifico (Colonna I)"]
         )
         
         submit = st.form_submit_button("Aggiungi alla lista")
